@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cherish Grocery List</title>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        /* Base styles */
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #fff8e1, #ffebcc);
+            padding: 20px;
+        }
+
+        .grocery-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #ff6f61;
+            margin-bottom: 20px;
+        }
+
+        .grocery-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .grocery-form input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #ffecd2;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .grocery-form button {
+            padding: 10px 15px;
+            background: #ff6f61;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .clear-btn, .export-btn, .import-btn {
+            padding: 10px 15px;
+            background: #ffab91;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        .clear-btn:hover, .export-btn:hover, .import-btn:hover {
+            background: #ff8a65;
+        }
+
+        .grocery-form button:hover {
+            background: #ff8a80;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 20px;
+        }
+
+        .grocery-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #ffe0b2;
+        }
+
+        .grocery-item input[type="checkbox"] {
+            margin-right: 15px;
+            accent-color: #ff6f61;
+        }
+
+        .grocery-item span {
+            flex: 1;
+            margin-right: 15px;
+            font-size: 16px;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #ff6f61;
+            font-size: 18px;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .delete-btn:hover {
+            color: #ff8a80;
+        }
+
+        .edit-input {
+            flex: 1;
+            margin-right: 15px;
+            padding: 5px;
+            font-size: 16px;
+            border: 1px solid #ffecd2;
+            border-radius: 4px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .grocery-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .grocery-form input {
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="grocery-container">
+        <h1>✨ My Cheerful Grocery List ✨</h1>
+        <ul id="groceryList"></ul>
+        <form class="grocery-form" onsubmit="addItem(event)">
+            <input type="text" id="itemInput" placeholder="Add a grocery item..." required>
+            <button type="submit">➕ Add</button>
+        </form>
+        <button class="export-btn" onclick="exportList()">📥 Export List</button>
+        <button class="import-btn" onclick="toggleImportFile()">📤 Import List</button>
+        <input type="file" id="importFile" accept=".txt" style="display: none;" onchange="importList()">
+        <button class="clear-btn" onclick="clearList()">🗑️ Clear List</button>
+    </div>
+
+    <script>
+        // Load items from localStorage when the page loads
+        window.onload = function() {
+            loadGroceryList();
+        };
+
+        function addItem(event) {
+            event.preventDefault();
+            const input = document.getElementById('itemInput');
+            const itemText = input.value.trim();
+
+            if (itemText === '') return;
+
+            const li = document.createElement('li');
+            li.className = 'grocery-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'grocery-checkbox';
+            checkbox.onchange = () => saveGroceryList(); // Save when checkbox state changes
+
+            const span = document.createElement('span');
+            span.textContent = itemText;
+            span.onclick = () => editItem(span); // Add click handler for editing
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.onclick = () => removeItem(li);
+
+            li.appendChild(checkbox);
+            li.appendChild(span);
+            li.appendChild(deleteBtn);
+
+            document.getElementById('groceryList').appendChild(li);
+            input.value = '';
+            input.focus();
+
+            saveGroceryList(); // Save to localStorage
+        }
+
+        function removeItem(li) {
+            li.remove();
+            saveGroceryList(); // Save to localStorage
+        }
+
+        function editItem(spanElement) {
+            const currentValue = spanElement.textContent;
+
+            // Create an input field with the current value
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentValue;
+            input.className = 'edit-input';
+
+            // Replace the span with the input field
+            spanElement.parentNode.replaceChild(input, spanElement);
+
+            // Focus the input and select its content
+            input.focus();
+            input.select();
+
+            // Handle saving when Enter is pressed or focus is lost
+            input.onblur = () => saveEdit(input, spanElement);
+            input.onkeydown = (event) => {
+                if (event.key === 'Enter') {
+                    saveEdit(input, spanElement);
+                } else if (event.key === 'Escape') {
+                    // Cancel edit on Escape key
+                    cancelEdit(input, spanElement, currentValue);
+                }
+            };
+        }
+
+        function saveEdit(input, spanElement) {
+            const newValue = input.value.trim();
+
+            // If the new value is empty, restore the original value
+            if (newValue === '') {
+                spanElement.textContent = spanElement.dataset.originalValue || '';
+            } else {
+                spanElement.textContent = newValue;
+            }
+
+            // Replace the input with the span element
+            input.parentNode.replaceChild(spanElement, input);
+
+            // Add the click handler back to the span
+            spanElement.onclick = () => editItem(spanElement);
+
+            saveGroceryList(); // Save to localStorage
+        }
+
+        function cancelEdit(input, spanElement, originalValue) {
+            spanElement.textContent = originalValue;
+            input.parentNode.replaceChild(spanElement, input);
+            spanElement.onclick = () => editItem(spanElement);
+        }
+
+        function saveGroceryList() {
+            const groceryList = document.getElementById('groceryList');
+            const items = [];
+
+            for (const li of groceryList.children) {
+                const checkbox = li.querySelector('.grocery-checkbox');
+                const span = li.querySelector('span');
+
+                items.push({
+                    text: span.textContent,
+                    checked: checkbox.checked
+                });
+            }
+
+            localStorage.setItem('groceryList', JSON.stringify(items));
+        }
+
+        function loadGroceryList() {
+            const storedItems = localStorage.getItem('groceryList');
+
+            if (!storedItems) return;
+
+            const items = JSON.parse(storedItems);
+
+            for (const item of items) {
+                const li = document.createElement('li');
+                li.className = 'grocery-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'grocery-checkbox';
+                checkbox.checked = item.checked;
+                checkbox.onchange = () => saveGroceryList(); // Save when checkbox state changes
+
+                const span = document.createElement('span');
+                span.textContent = item.text;
+                span.onclick = () => editItem(span);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.onclick = () => removeItem(li);
+
+                li.appendChild(checkbox);
+                li.appendChild(span);
+                li.appendChild(deleteBtn);
+
+                document.getElementById('groceryList').appendChild(li);
+            }
+        }
+
+        function clearList() {
+            if (confirm('Are you sure you want to clear the entire grocery list?')) {
+                document.getElementById('groceryList').innerHTML = '';
+                localStorage.removeItem('groceryList'); // Also clear from localStorage
+            }
+        }
+
+        function exportList() {
+            const groceryList = document.getElementById('groceryList');
+            const items = groceryList.querySelectorAll('li');
+
+            if (items.length === 0) {
+                alert('The grocery list is empty!');
+                return;
+            }
+
+            let content = '';
+            for (const item of items) {
+                const span = item.querySelector('span');
+                content += `- ${span.textContent}\n`;
+            }
+
+            // Create a Blob with the content
+            const blob = new Blob([content], { type: 'text/plain' });
+
+            // Create a link element to trigger the download
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'grocery-list.txt';
+
+            // Trigger the download
+            document.body.appendChild(a);
+            a.click();
+
+            // Clean up
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        function toggleImportFile() {
+            const fileInput = document.getElementById('importFile');
+            fileInput.click();
+        }
+
+        function importList() {
+            const fileInput = document.getElementById('importFile');
+            const file = fileInput.files[0];
+
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const lines = content.split('\n');
+
+                // Clear existing list
+                document.getElementById('groceryList').innerHTML = '';
+
+                for (const line of lines) {
+                    // Check if line starts with "- " and extract the item
+                    if (line.startsWith('- ')) {
+                        const itemText = line.substring(2).trim(); // Remove "- " prefix
+
+                        // Sanitize the input to prevent XSS
+                        const sanitizedItemText = sanitizeHTML(itemText);
+
+                        if (sanitizedItemText !== '') {
+                            addItemToList(sanitizedItemText);
+                        }
+                    }
+                }
+
+                // Clear the file input
+                fileInput.value = '';
+
+                // Save to localStorage
+                saveGroceryList();
+            };
+            reader.readAsText(file);
+        }
+
+        // Function to sanitize HTML to prevent XSS
+        function sanitizeHTML(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Helper function to add an item to the list (without form submission)
+        function addItemToList(itemText) {
+            const li = document.createElement('li');
+            li.className = 'grocery-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'grocery-checkbox';
+            checkbox.onchange = () => saveGroceryList(); // Save when checkbox state changes
+
+            const span = document.createElement('span');
+            span.textContent = itemText;
+            span.onclick = () => editItem(span);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.onclick = () => removeItem(li);
+
+            li.appendChild(checkbox);
+            li.appendChild(span);
+            li.appendChild(deleteBtn);
+
+            document.getElementById('groceryList').appendChild(li);
+        }
+    </script>
+</body>
+</html>
